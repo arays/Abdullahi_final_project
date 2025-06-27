@@ -1,0 +1,329 @@
+---
+title: "Gapminder | gdpPercap 1952-2007"
+author: "Abdullahi Farah"
+format: dashboard
+theme: lux
+---
+##
+```{r, echo=FALSE,  message = FALSE}
+if(!require("pacman")) install.packages("pacman")
+pacman::p_load(
+  tidyverse,
+  gapminder, 
+  plotly,
+  highcharter, 
+  bslib,
+  bsicons,
+  shiny,
+  reactable,
+  rnaturalearth, 
+  plotly,
+  countrycode,
+  htmltools, 
+  gganimate,
+  scales,
+  flextable,
+  reactable
+)
+```
+
+```{r, include=FALSE}
+gapminder 
+avg_gdp_per_country <- gapminder %>%
+  filter(year == 2007) %>%
+  group_by(country) %>%
+  summarise(avg_gdpPercap = mean(gdpPercap, na.rm = TRUE)) %>%
+  arrange(desc(avg_gdpPercap))
+
+```
+
+```{r, echo=FALSE}
+highest_gdpPercap_county <- avg_gdp_per_country %>% 
+  arrange(-avg_gdpPercap) %>% 
+  head(1) %>% 
+  pull(country)
+
+highest_gdpPercap_value <- avg_gdp_per_country %>% 
+  arrange(-avg_gdpPercap) %>% 
+  head(1) %>% 
+  pull(avg_gdpPercap) %>% 
+  round(1)
+```
+
+```{r, echo=FALSE}
+lowest_gdpPercap_county <- avg_gdp_per_country %>% 
+  arrange(avg_gdpPercap) %>% 
+  head(1) %>% 
+  pull(country)
+
+lowest_gdpPercap_value <- gapminder %>% 
+  arrange(gdpPercap) %>% 
+  head(1) %>% 
+  pull(gdpPercap) %>% 
+  round(1)
+
+average_gdpPercap <- gapminder %>%
+  summarise(weighted_mean = sum(gdpPercap * pop) / sum(pop)) %>%
+  mutate(weighted_mean = round(weighted_mean, 1))
+```
+
+```{r, echo=FALSE}
+
+
+ 
+country_shape <- rnaturalearth::ne_countries()
+
+gapminder <- gapminder %>% 
+  mutate(country_code=countrycode(country, "country.name",
+                                  "iso3c"))
+
+gap_map <- left_join(country_shape, gapminder, by=c("adm0_a3"="country_code")) %>% 
+  mutate(tooltip_label=paste(country, round(gdpPercap, 1),
+         sep=" : ")) %>% 
+   ggplot()+
+   geom_sf( aes(fill=gdpPercap, text=tooltip_label))+
+   scale_fill_gradient(low = "lightgreen", high = "darkgreen", na.value = "grey80")+
+     theme_void()+
+     theme(legend.position="none")
+
+  gap_map_ggplotly <-   ggplotly(gap_map, tooltip="text")
+
+    
+```
+
+
+# Home
+
+## Row 1 {height="25%"}
+
+```{r}
+
+
+
+value_box(
+  title = "Highest gdpPercap",
+  value = highest_gdpPercap_value,
+  showcase = bsicons::bs_icon("currency-dollar"),
+  theme = value_box_theme(bg="#156e47"),
+   p(paste0("(", highest_gdpPercap_county, ")"))
+)
+```
+
+
+
+
+
+```{r, echo=FALSE}
+
+value_box(
+  title = "Lowest gdpPercap",
+  value = lowest_gdpPercap_value,
+  showcase = bsicons::bs_icon("currency-dollar"),
+  theme = value_box_theme(bg="#e81554"),
+   p(paste0("(", lowest_gdpPercap_county, ")"))
+)
+```
+
+```{r, echo=FALSE}
+value_box(
+  title = "Average gdpPercap",
+  value = average_gdpPercap,
+  showcase = bsicons::bs_icon("currency-dollar"),
+  theme = value_box_theme(bg="#32a852")
+)
+```
+
+## Row 2 {height="75%"}
+
+###  {width="65%"}
+
+```{r, echo=FALSE, title = "Map of countries by  GDP Per capita"}
+
+gap_map_ggplotly
+```
+
+###  {width="35%"}
+
+```{r, echo=FALSE, title = "Top 10  countries by gdpPercap"}
+
+avg_gdp_per_country <- gapminder %>%
+  filter(year == 2007) %>%
+  group_by(country) %>%
+  summarise(avg_gdpPercap = mean(gdpPercap, na.rm = TRUE)) %>%
+  arrange(desc(avg_gdpPercap)) %>%
+  slice_head(n = 10) %>%
+  mutate(tooltip_label = paste(country, round(avg_gdpPercap, 1), sep = " : "))
+
+# Step 2: Create plot with centered text
+top_10_avg_gdp_plot <- avg_gdp_per_country %>%
+  ggplot(aes(y = reorder(country, avg_gdpPercap),
+             x = avg_gdpPercap,
+             fill = avg_gdpPercap,
+             text = tooltip_label)) +
+  geom_col() +
+  geom_text(aes(label = round(avg_gdpPercap, 1)),
+            position = position_stack(vjust = 0.5), # vertical alignment
+            colour = "white",
+            hjust = 0.5, # horizontal center
+            size = 3.5) +
+  scale_fill_gradient(low = "red", high = "darkgreen") +
+  labs(
+    title = "Top 10 Countries by Average GDP per Capita (2007)",
+    y = "Country",
+    x = "Average GDP per Capita (USD)"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none"
+  )
+
+# Step 3: Make interactive
+top_10_avg_gdp_ggplotly <- ggplotly(top_10_avg_gdp_plot, tooltip = "text")
+top_10_avg_gdp_ggplotly
+
+
+
+```
+
+# GDP per capita of three  selected countries 
+## {.tabset}
+### Tab 1
+```{r, echo=FALSE, message=FALSE, title = "GDP Growth Over Time (Interactive)"}
+gapminder %>% 
+  filter(country %in% c("Pakistan", "China", "India")) %>% 
+  mutate(log10_gdpPercap= log10(gdpPercap)) %>% 
+  plot_ly(x = ~year, y = ~log10_gdpPercap, color = ~country, type = 'scatter', mode = 'lines+markers') %>%
+  layout(title = "Log10 of GDP per Capita: Pakistan, China, India",
+         xaxis = list(title = "Year"),
+         yaxis = list(title = "log10(GDP per Capita)"))
+```
+### Tab 2
+```{r, title= "GDP per Capita: Pakistan, China, India"}
+
+gap_map_pic <- left_join(country_shape, gapminder, by=c("adm0_a3"="country_code")) %>% 
+  filter(country %in% c("Pakistan", "China", "India")) %>% 
+  mutate(tooltip_label=paste(country, round(gdpPercap, 1),
+         sep=" : ")) %>% 
+   ggplot()+
+   geom_sf( aes(fill=gdpPercap, text=tooltip_label))+
+     theme_void()+
+     theme(legend.position="none")
+
+  gap_map_pic_ggplotly <-   ggplotly(gap_map_pic, tooltip="text")
+  gap_map_pic_ggplotly
+
+```
+
+
+
+
+# GDP per capita by continent
+## {.tabset}
+### Tab 1
+
+```{r, echo=FALSE}
+gapminder %>%
+   mutate(log10_gdpPercap= log10(gdpPercap)) %>% 
+  ggplot(aes(x = continent, y = log10_gdpPercap, fill = continent)) +
+  geom_boxplot() +
+  labs(title = "GDP per Capita by Continent", x = "Continent", y = "log10 of GDP per Capita")
+```
+### Tab 2   
+```{r title= "Mean GDP per Capita and Log10 GDP per Capita by Continent"}
+gdp_summary_table <- gapminder %>%
+  mutate(log10_gdpPercap = log10(gdpPercap)) %>%
+  group_by(continent) %>%
+  summarise(
+    mean_gdpPercap = round(mean(gdpPercap, na.rm = TRUE), 1),
+    mean_log10_gdpPercap = round(mean(log10_gdpPercap, na.rm = TRUE), 1)
+  ) 
+
+summary_table <- reactable(
+  gdp_summary_table,
+  columns = list(
+    continent = colDef(name = "Continent"),
+    mean_gdpPercap = colDef(name = "Mean GDP per Capita"),
+    mean_log10_gdpPercap = colDef(
+      name = "Mean log10 GDP per Capita",
+      style = function(value) {
+        if (value < 3.6) {
+          list(background = "red")
+        } else {
+          NULL
+        }
+      }
+    )
+  ),
+  bordered = TRUE,
+  highlight = TRUE,
+  defaultPageSize = 5
+)
+summary_table
+
+
+```
+
+# per capita vs life expectancy
+
+```{r, echo=FALSE, title: "GDP vs Life Expectancy"}
+
+gapminder %>%
+  mutate(gdpPercap = log10(gdpPercap)) %>%
+  plot_ly(
+    x = ~gdpPercap, y = ~lifeExp,
+    size = ~pop, color = ~continent,
+    frame = ~year, text = ~country,
+    hoverinfo = "text",
+    type = 'scatter', mode = 'markers',
+    sizes = c(80, 480),
+    marker = list(sizemode = 'area', opacity = 0.8)
+  ) %>%
+  layout(
+    xaxis = list(title = "log10 GDP per Capita"),
+    yaxis = list(title = "Life Expectancy")
+  )
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+# DOWNLOAD DATA
+
+The data used in this dashbaoard is shown below and can be downloaded as a CSV.
+
+```{r, echo=FALSE}
+
+
+htmltools::browsable(
+  tagList(
+    reactable(gapminder,
+          searchable=T, 
+          filterable = T,
+      elementId = "gapminder-table"
+    ),
+     tags$button("Download as CSV", onclick = "Reactable.downloadDataCSV('gapminder-table')")
+  )
+)
+
+
+```
+
+# About
+
+This is from the r `Gapminder` package and is originally sources from the Gapminder foundation.
+
+The Gapminder Foundation is a non-profit venture registered in Stockholm, Sweden, that promotes sustainable global development and achievement of the United Nations Millennium Development Goals by increased use and understanding of statistics and other information about social, economic, and environmental development at local, national, and global levels.\[1\] Gapminder was founded in 2005 by Ola Rosling, Anna Rosling Rönnlund, and Hans Rosling.\[2\] The name Gapminder was derived from the "Mind the Gap" warning messages on the London Underground An example of one of Hans Rosling's Video is shown below
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/ZfvpBdjKjhM?si=ltbzGgqZVMMRp0pj" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen>
+
+</iframe>
