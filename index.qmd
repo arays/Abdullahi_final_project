@@ -264,7 +264,7 @@ summary_table
 
 ```
 
-# per capita vs life expectancy
+# per capita vs life expectancy {height=75%}
 
 ```{r, echo=FALSE, title: "GDP vs Life Expectancy"}
 
@@ -285,7 +285,14 @@ gapminder %>%
   )
 
 ```
+::: {.card height=25%}
+## Summary Insights
 
+- The data shows a direct relationship between GDP per capita and life expectancy.  
+- Countries with higher GDP also have higher life expectancy.  
+- Poor countries in Sub-Saharan Africa have the lowest life expectancy.
+- Life expectancy is below 50 years in least developed countries
+:::
 
 
 
